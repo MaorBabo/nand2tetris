@@ -1,0 +1,62 @@
+// This file is part of nand2tetris, as taught in The Hebrew University, and
+// was written by Aviv Yaish. It is an extension to the specifications given
+// [here](https://www.nand2tetris.org) (Shimon Schocken and Noam Nisan, 2017),
+// as allowed by the Creative Common Attribution-NonCommercial-ShareAlike 3.0
+// Unported [License](https://creativecommons.org/licenses/by-nc-sa/3.0/).
+
+
+// The ExtendAlu chip is an extension of the standard ALU which also supports
+// shift operations.
+// The inputs of the extended ALU are instruction[9], x[16], y[16].
+// The "ng" and "zr" output pins behave the same as in the regular ALU.
+// The "out" output is defined as follows:
+// If instruction[8]=1 and instruction[7]=1 the output is identical to the 
+// regular ALU, where:
+// instruction[5]=zx, instruction[4]=nx, ..., instruction[0]=no
+// Else, if instruction[8]=0 and instruction[7]=1, the output is a shift:
+// - If instruction[4] == 0, the input "y" will be shifted, otherwise "x".
+// - If instruction[5] == 0, the shift will be a right-shift, otherwise left.
+// - All other inputs are undefined.
+
+CHIP ExtendAlu {
+     IN x[16], y[16], instruction[9];
+     OUT out[16], zr, ng;
+     
+     PARTS:
+     // Put your code here:
+	 
+	 // determines if we return the regular ALU output or not:
+	 And(a=instruction[7] ,b=instruction[8] ,out=regularALUout);
+	 Not(in=regularALUout, out=needShift);
+	 
+	
+	 Mux16(a=y ,b=x ,sel=instruction[4] ,out=varToShift);
+	 
+	// now we shift:
+	 ShiftRight(in=varToShift, out=ShiftedR);
+	 ShiftLeft(in=varToShift, out=ShiftedL);
+	 Mux16(a=ShiftedR ,b=ShiftedL ,sel=instruction[5] ,out=outShiftM);
+	 
+	//normal ALU:
+	ALU(x=x ,y=y ,zx=instruction[5]
+	,nx=instruction[4]
+	,zy=instruction[3]
+	,ny=instruction[2]
+	,f=instruction[1]
+	,no=instruction[0]
+	,out=AluOut ,zr=zrALU ,ng=ngALU);
+	
+	//determines the final output:
+	Mux16(a=outShiftM ,b=AluOut ,sel=regularALUout ,out=out, out[15]=ngOut, out[0..7]=firstzr, out[8..15]=secondzr);
+	
+	// ng
+	Mux(a=ngALU ,b=ngOut ,sel=needShift ,out=ng);
+	
+    //zr
+    Or8Way (in=firstzr, out=out1zr);
+    Or8Way (in=secondzr, out=out2zr);
+    Or (a=out1zr, b=out2zr, out=notzr);
+    Not (in=notzr, out=zrOut);
+
+	Mux(a=zrALU ,b=zrOut ,sel=needShift ,out=zr);
+}
